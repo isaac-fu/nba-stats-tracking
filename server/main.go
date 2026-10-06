@@ -1,9 +1,9 @@
 package main
 
 import (
-	// "context"
-	// "fmt"
-	// "os"
+	"context"
+	"fmt"
+	"os"
 	"log"
 
 	"github.com/gofiber/fiber/v2"

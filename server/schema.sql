@@ -40,3 +40,7 @@ CREATE TABLE IF NOT EXISTS player_game_stats (
 
     UNIQUE (game_id, player_id)
 );
+
+ALTER TABLE teams ADD COLUMN external_id INTEGER UNIQUE;
+ALTER TABLE players ADD COLUMN external_id INTEGER UNIQUE;
+ALTER TABLE games ADD COLUMN external_id INTEGER UNIQUE;
