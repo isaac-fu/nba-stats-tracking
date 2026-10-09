@@ -63,10 +63,10 @@ func importTeams(
 				abbreviation
 			)
 			VALUES ($1, $2, $3)
-			ON CONFLICT (abbreviation)
+			ON CONFLICT (external_id)
 			DO UPDATE SET
-				external_id = EXCLUDED.external_id,
-				name = EXCLUDED.name
+				name = EXCLUDED.name,
+				abbreviation = EXCLUDED.abbreviation
 		`,
 			team.ID,
 			team.FullName,
