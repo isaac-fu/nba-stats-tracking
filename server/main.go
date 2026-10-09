@@ -12,6 +12,8 @@ import (
 
 func main() {
 
+	fmt.Printf(os.Getenv("ENV"))
+	fmt.Println("hello world")
 	// Load environment variables from .env file
 	err := godotenv.Load()
 	if err != nil {

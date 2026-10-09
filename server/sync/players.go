@@ -32,8 +32,22 @@ type PlayersResponse struct {
 func importPlayers(
 	ctx context.Context,
 	db *pgxpool.Pool,
+	cooler *PGCooler,
+	allowedTeamIDs map[int]struct{},
 	apiKey string,
 ) error {
+	var existingPlayers int
+	if err := db.QueryRow(ctx, `SELECT COUNT(*) FROM players`).Scan(&existingPlayers); err != nil {
+		return fmt.Errorf("checking existing players: %w", err)
+	}
+	if existingPlayers > 0 {
+		fmt.Printf(
+			"Found %d existing players; skipping players API request\n",
+			existingPlayers,
+		)
+		return nil
+	}
+
 	cursor := 0
 	totalPlayers := 0
 
@@ -59,7 +73,7 @@ func importPlayers(
 
 		req.Header.Set("Authorization", apiKey)
 
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := cooler.Do(req)
 		if err != nil {
 			return err
 		}
@@ -79,6 +93,16 @@ func importPlayers(
 		}
 
 		for _, player := range result.Data {
+			if _, allowed := allowedTeamIDs[player.Team.ID]; !allowed {
+				fmt.Printf(
+					"Skipping player %s %s (historical or defunct team external_id=%d)\n",
+					player.FirstName,
+					player.LastName,
+					player.Team.ID,
+				)
+				continue
+			}
+
 			playerName := player.FirstName + " " + player.LastName
 
 			commandTag, err := db.Exec(ctx, `
@@ -94,9 +118,7 @@ func importPlayers(
 				FROM teams
 				WHERE external_id = $3
 				ON CONFLICT (external_id)
-				DO UPDATE SET
-					name = EXCLUDED.name,
-					team_id = EXCLUDED.team_id
+			DO NOTHING
 			`,
 				player.ID,
 				playerName,

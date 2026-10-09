@@ -89,6 +89,8 @@ func parseMinutes(value string) (int, error) {
 func importStatsForGame(
 	ctx context.Context,
 	db *pgxpool.Pool,
+	cooler *PGCooler,
+	allowedTeamIDs map[int]struct{},
 	apiKey string,
 	gameExternalID int,
 ) error {
@@ -118,7 +120,7 @@ func importStatsForGame(
 
 		req.Header.Set("Authorization", apiKey)
 
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := cooler.Do(req)
 		if err != nil {
 			return err
 		}
@@ -138,6 +140,27 @@ func importStatsForGame(
 		}
 
 		for _, stat := range result.Data {
+			if _, allowed := allowedTeamIDs[stat.Team.ID]; !allowed {
+				fmt.Printf(
+					"Skipping stats for player %d on a historical or defunct team external_id=%d\n",
+					stat.Player.ID,
+					stat.Team.ID,
+				)
+				continue
+			}
+			if stat.Game.HomeTeam.ID != 0 && stat.Game.VisitorTeam.ID != 0 {
+				_, homeAllowed := allowedTeamIDs[stat.Game.HomeTeam.ID]
+				_, visitorAllowed := allowedTeamIDs[stat.Game.VisitorTeam.ID]
+				if !homeAllowed || !visitorAllowed {
+					fmt.Printf(
+						"Skipping stats for player %d because game %d involves a historical or defunct team\n",
+						stat.Player.ID,
+						stat.Game.ID,
+					)
+					continue
+				}
+			}
+
 			minutesSeconds, err := parseMinutes(stat.Minutes)
 			if err != nil {
 				return fmt.Errorf(

@@ -42,19 +42,46 @@ type GamesResponse struct {
 func importGames(
 	ctx context.Context,
 	db *pgxpool.Pool,
+	cooler *PGCooler,
+	allowedTeamIDs map[int]struct{},
 	apiKey string,
+	season int,
 ) error {
+	// BALLDONTLIE labels a season by the year it begins. For example,
+	// season 2025 represents the 2025-26 NBA season.
+
+	existingGames, err := hasGamesForSeason(ctx, db, season)
+	if err != nil {
+		return fmt.Errorf("checking existing games for season %d: %w", season, err)
+	}
+	if existingGames {
+		fmt.Printf(
+			"Found existing games for season %d; skipping games API request\n",
+			season,
+		)
+		return nil
+	}
+
 	var cursor int
+	page := 0
+	importedGames := 0
+	skippedGames := 0
 
 	for {
+		page++
+
 		params := url.Values{}
 		params.Set("per_page", "100")
+		addTeamFilters(params, allowedTeamIDs)
+		params.Add("seasons[]", strconv.Itoa(season))
+		params.Set("season_type", "regular")
 
 		if cursor > 0 {
 			params.Set("cursor", strconv.Itoa(cursor))
 		}
 
 		apiURL := "https://api.balldontlie.io/v1/games?" + params.Encode()
+		fmt.Printf("Fetching games page %d (cursor=%d)...\n", page, cursor)
 
 		req, err := http.NewRequestWithContext(
 			ctx,
@@ -68,7 +95,7 @@ func importGames(
 
 		req.Header.Set("Authorization", apiKey)
 
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := cooler.Do(req)
 		if err != nil {
 			return err
 		}
@@ -87,7 +114,16 @@ func importGames(
 			return err
 		}
 
+		fmt.Printf("Received %d games on page %d\n", len(result.Data), page)
+
 		for _, game := range result.Data {
+			_, homeAllowed := allowedTeamIDs[game.HomeTeam.ID]
+			_, visitorAllowed := allowedTeamIDs[game.VisitorTeam.ID]
+			if !homeAllowed || !visitorAllowed {
+				skippedGames++
+				continue
+			}
+
 			commandTag, err := db.Exec(ctx, `
 				INSERT INTO games (
 					external_id,
@@ -109,12 +145,7 @@ func importGames(
 					ON away.external_id = $3
 				WHERE home.external_id = $2
 				ON CONFLICT (external_id)
-				DO UPDATE SET
-					home_team_id = EXCLUDED.home_team_id,
-					away_team_id = EXCLUDED.away_team_id,
-					game_date = EXCLUDED.game_date,
-					home_score = EXCLUDED.home_score,
-					away_score = EXCLUDED.away_score
+			DO NOTHING
 			`,
 				game.ID,
 				game.HomeTeam.ID,
@@ -136,15 +167,48 @@ func importGames(
 					game.VisitorTeam.ID,
 				)
 			}
+			importedGames++
 		}
 
 		if result.Meta.NextCursor == nil {
 			break
 		}
 
-		cursor = *result.Meta.NextCursor
+		nextCursor := *result.Meta.NextCursor
+		if nextCursor == cursor {
+			return fmt.Errorf(
+				"games API pagination cursor did not advance: %d",
+				cursor,
+			)
+		}
+
+		cursor = nextCursor
 	}
 
-	fmt.Println("Imported games")
+	fmt.Printf(
+		"Imported %d games (skipped %d games involving historical or defunct teams)\n",
+		importedGames,
+		skippedGames,
+	)
 	return nil
+}
+
+func hasGamesForSeason(
+	ctx context.Context,
+	db *pgxpool.Pool,
+	season int,
+) (bool, error) {
+	var gameCount int
+
+	err := db.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM games
+		WHERE game_date >= make_date($1, 10, 1)
+		  AND game_date < make_date($1 + 1, 10, 1)
+	`, season).Scan(&gameCount)
+	if err != nil {
+		return false, err
+	}
+
+	return gameCount > 0, nil
 }
