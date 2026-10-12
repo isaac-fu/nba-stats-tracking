@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
+	"net/url"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -28,87 +28,72 @@ func importTeams(
 	cooler *PGCooler,
 	apiKey string,
 ) (map[int]struct{}, error) {
-	existingTeamIDs, complete, err := loadExistingAllowedTeamIDs(ctx, db)
+	existingTeamIDs, currentComplete, err := loadExistingAllowedTeamIDs(ctx, db)
 	if err != nil {
-		return nil, fmt.Errorf("checking existing teams: %w", err)
+		return nil, fmt.Errorf("checking existing teams (verify teams.external_id exists): %w", err)
 	}
-	if complete {
+
+	progress, progressFound, err := loadSyncProgress(ctx, db, "teams", "all")
+	if err != nil {
+		return nil, fmt.Errorf("checking team sync progress: %w", err)
+	}
+
+	if currentComplete &&
+		!shouldReimportExistingData() &&
+		(!progressFound || progress.Status == "complete") {
+		if !progressFound {
+			if err := markSyncComplete(ctx, db, "teams", "all", int64(len(existingTeamIDs))); err != nil {
+				return nil, err
+			}
+		}
 		fmt.Printf(
-			"Found %d existing NBA teams; skipping teams API request\n",
+			"Found %d existing eligible NBA teams; skipping teams API request\n",
 			len(existingTeamIDs),
 		)
 		return existingTeamIDs, nil
 	}
 
-	req, err := http.NewRequestWithContext(
-		ctx,
-		"GET",
-		"https://api.balldontlie.io/v1/teams",
-		nil,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Authorization", apiKey)
-
-	resp, err := cooler.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("teams API request failed: %s", resp.Status)
-	}
-
 	var result TeamsResponse
-
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := getAPIJSON(ctx, cooler, apiKey, "/teams", url.Values{}, &result); err != nil {
 		return nil, err
 	}
 
-	allowedTeamIDs := make(map[int]struct{})
-	importedTeams := 0
+	eligibleTeams := make([]Team, 0, len(result.Data))
+	allowedTeamIDs := make(map[int]struct{}, len(existingTeamIDs)+len(result.Data))
+	for teamID := range existingTeamIDs {
+		allowedTeamIDs[teamID] = struct{}{}
+	}
+
 	for _, team := range result.Data {
-		if !isEligibleNBATeam(team.ID, team.FullName) {
-			fmt.Printf(
-				"Skipping historical or defunct team %s (external_id=%d)\n",
-				team.FullName,
-				team.ID,
-			)
+		if !isEligibleNBATeam(team.ID, team.FullName, team.Abbreviation) {
 			continue
 		}
 
-		_, err := db.Exec(ctx, `
-        INSERT INTO teams (
-            external_id,
-            name,
-            abbreviation
-        )
-        VALUES ($1, $2, $3)
-        ON CONFLICT (external_id)
-		DO NOTHING
-    `,
-        team.ID,
-        team.FullName,
-        team.Abbreviation,
-        )
-
-		if err != nil {
+		eligibleTeams = append(eligibleTeams, team)
+		allowedTeamIDs[team.ID] = struct{}{}
+	}
+	for currentTeamID := range currentNBAAbbreviations {
+		if _, ok := allowedTeamIDs[currentTeamID]; !ok {
 			return nil, fmt.Errorf(
-				"inserting team %s (external_id=%d, abbreviation=%s): %w",
-				team.FullName,
-				team.ID,
-				team.Abbreviation,
-				err,
+				"teams API/database data is missing current NBA team external_id=%d",
+				currentTeamID,
 			)
 		}
-		allowedTeamIDs[team.ID] = struct{}{}
-		importedTeams++
 	}
 
-	fmt.Printf("Imported %d teams\n", importedTeams)
+	inserted, err := mergeTeams(ctx, db, eligibleTeams)
+	if err != nil {
+		return nil, err
+	}
+	if err := markSyncComplete(ctx, db, "teams", "all", int64(len(eligibleTeams))); err != nil {
+		return nil, err
+	}
+
+	fmt.Printf(
+		"Processed %d eligible NBA teams (%d newly inserted; historical/defunct teams excluded)\n",
+		len(eligibleTeams),
+		inserted,
+	)
 	return allowedTeamIDs, nil
 }
 
@@ -119,7 +104,7 @@ func loadExistingAllowedTeamIDs(
 	db *pgxpool.Pool,
 ) (map[int]struct{}, bool, error) {
 	rows, err := db.Query(ctx, `
-		SELECT external_id, name
+		SELECT external_id, name, abbreviation
 		FROM teams
 	`)
 	if err != nil {
@@ -128,16 +113,22 @@ func loadExistingAllowedTeamIDs(
 	defer rows.Close()
 
 	allowedTeamIDs := make(map[int]struct{})
+	currentTeamCount := 0
 	for rows.Next() {
 		var externalID int
 		var fullName string
+		var abbreviation string
 
-		if err := rows.Scan(&externalID, &fullName); err != nil {
+		if err := rows.Scan(&externalID, &fullName, &abbreviation); err != nil {
 			return nil, false, err
 		}
 
-		if isEligibleNBATeam(externalID, fullName) {
-			allowedTeamIDs[externalID] = struct{}{}
+		if !isEligibleNBATeam(externalID, fullName, abbreviation) {
+			continue
+		}
+		allowedTeamIDs[externalID] = struct{}{}
+		if isCurrentNBATeamID(externalID) {
+			currentTeamCount++
 		}
 	}
 
@@ -145,5 +136,61 @@ func loadExistingAllowedTeamIDs(
 		return nil, false, err
 	}
 
-	return allowedTeamIDs, len(allowedTeamIDs) >= expectedCurrentNBATeams, nil
+	return allowedTeamIDs, currentTeamCount == expectedCurrentNBATeams, nil
+}
+
+func mergeTeams(
+	ctx context.Context,
+	db *pgxpool.Pool,
+	teams []Team,
+) (int64, error) {
+	if len(teams) == 0 {
+		return 0, nil
+	}
+
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("starting team merge transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	_, err = tx.Exec(ctx, `
+		CREATE TEMP TABLE nba_stage_teams (
+			external_id INTEGER NOT NULL,
+			name TEXT NOT NULL,
+			abbreviation TEXT NOT NULL
+		) ON COMMIT DROP
+	`)
+	if err != nil {
+		return 0, fmt.Errorf("creating team staging table: %w", err)
+	}
+
+	rows := make([][]any, 0, len(teams))
+	for _, team := range teams {
+		rows = append(rows, []any{int32(team.ID), team.FullName, team.Abbreviation})
+	}
+
+	if _, err := tx.CopyFrom(
+		ctx,
+		pgx.Identifier{"nba_stage_teams"},
+		[]string{"external_id", "name", "abbreviation"},
+		pgx.CopyFromRows(rows),
+	); err != nil {
+		return 0, fmt.Errorf("copying teams into staging: %w", err)
+	}
+
+	commandTag, err := tx.Exec(ctx, `
+		INSERT INTO teams (external_id, name, abbreviation)
+		SELECT external_id, name, abbreviation
+		FROM nba_stage_teams
+		ON CONFLICT (external_id) DO NOTHING
+	`)
+	if err != nil {
+		return 0, fmt.Errorf("merging staged teams: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return 0, fmt.Errorf("committing team merge: %w", err)
+	}
+	return commandTag.RowsAffected(), nil
 }

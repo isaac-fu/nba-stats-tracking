@@ -2,22 +2,25 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
-	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
 
 func main() {
-	if err := godotenv.Load("../.env"); err != nil {
-		log.Fatal("could not load .env")
+	if err := godotenv.Load("../.env"); err != nil && !os.IsNotExist(err) {
+		log.Printf("could not load ../.env; using process environment: %v", err)
 	}
 
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	dbConfig, err := pgxpool.ParseConfig(os.Getenv("DATABASE_URL"))
 	if err != nil {
@@ -46,6 +49,13 @@ func main() {
 	}
 	cancel()
 
+	if err := validateBaseSchema(ctx, db); err != nil {
+		log.Fatal(err)
+	}
+	if err := ensureSyncTables(ctx, db); err != nil {
+		log.Fatal(err)
+	}
+
 	apiKey := os.Getenv("BALLDONTLIE_API_KEY")
 	if apiKey == "" {
 		log.Fatal("BALLDONTLIE_API_KEY is not set")
@@ -65,15 +75,14 @@ func main() {
 	}
 
 	startSeason := envInt("NBA_START_SEASON", 1980)
-	endSeason := envInt("NBA_END_SEASON", 2025)
-
+	currentSeason := envInt("NBA_CURRENT_SEASON", defaultNBASeason(time.Now()))
+	endSeason := envInt("NBA_END_SEASON", currentSeason)
 	if startSeason > endSeason {
 		log.Fatal("NBA_START_SEASON cannot be greater than NBA_END_SEASON")
 	}
 
 	for season := startSeason; season <= endSeason; season++ {
-		fmt.Printf("Starting import for season %d-%d\n", season, season+1)
-
+		fmt.Printf("Starting game import for season %d-%d\n", season, season+1)
 		if err := importGames(
 			ctx,
 			db,
@@ -84,28 +93,56 @@ func main() {
 		); err != nil {
 			log.Fatalf("season %d import failed: %v", season, err)
 		}
-
-		fmt.Printf("Finished import for season %d-%d\n", season, season+1)
+		fmt.Printf("Finished game import for season %d-%d\n", season, season+1)
 	}
 
-	if len(os.Args) < 2 {
-		log.Println("Skipping stats import. Provide a game ID to import stats.")
+	// A positional game ID keeps the original targeted-import workflow. For a
+	// complete stats backfill, set NBA_IMPORT_STATS=true; stats are then fetched
+	// in batches and only games without completed stats are requested for final
+	// seasons.
+	if len(os.Args) > 1 {
+		for _, argument := range os.Args[1:] {
+			gameExternalID, err := strconv.Atoi(argument)
+			if err != nil {
+				log.Fatalf("invalid game ID %q: %v", argument, err)
+			}
+			if err := importStatsForGame(
+				ctx,
+				db,
+				cooler,
+				allowedTeamIDs,
+				apiKey,
+				gameExternalID,
+			); err != nil {
+				log.Fatal(err)
+			}
+		}
 		return
 	}
 
-	gameExternalID, err := strconv.Atoi(os.Args[1])
-	if err != nil {
-		log.Fatal("invalid game ID:", err)
+	if !envBool("NBA_IMPORT_STATS", false) {
+		log.Println("Skipping stats import. Set NBA_IMPORT_STATS=true or pass a game ID.")
+		return
 	}
 
-	if err := importStatsForGame(
-		ctx,
-		db,
-		cooler,
-		allowedTeamIDs,
-		apiKey,
-		gameExternalID,
-	); err != nil {
-		log.Fatal(err)
+	statsStartSeason := envInt("NBA_STATS_START_SEASON", startSeason)
+	statsEndSeason := envInt("NBA_STATS_END_SEASON", endSeason)
+	if statsStartSeason > statsEndSeason {
+		log.Fatal("NBA_STATS_START_SEASON cannot be greater than NBA_STATS_END_SEASON")
+	}
+	statsBatchSize := envInt("NBA_STATS_BATCH_SIZE", 50)
+
+	for season := statsStartSeason; season <= statsEndSeason; season++ {
+		if err := importStatsForSeason(
+			ctx,
+			db,
+			cooler,
+			allowedTeamIDs,
+			apiKey,
+			season,
+			statsBatchSize,
+		); err != nil {
+			log.Fatalf("stats import for season %d failed: %v", season, err)
+		}
 	}
 }
