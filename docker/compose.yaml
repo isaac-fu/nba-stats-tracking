@@ -61,8 +61,8 @@ services:
       <<: *pg-environment
       DBT_SCHEMA: ${DBT_SCHEMA:-build_dev}
       DBT_THREADS: ${DBT_THREADS:-2}
-      DBT_PROFILES_DIR: /opt/dbt
-      DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
+      DBT_ENGINE_PROFILES_DIR: /opt/dbt
+      DBT_ENGINE_SEND_ANONYMOUS_USAGE_STATS: "false"
     depends_on:
       postgres:
         condition: service_healthy

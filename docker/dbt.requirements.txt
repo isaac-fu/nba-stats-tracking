@@ -1,0 +1,4 @@
+# Supported dbt v1 releases selected on 2026-10-12.
+# Direct versions are pinned; transitive dependencies still need a resolved lock.
+dbt-core==1.12.5
+dbt-postgres==1.11.0
