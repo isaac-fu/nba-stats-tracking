@@ -1,0 +1,87 @@
+name: nba-stats-tracking
+
+x-pg-environment: &pg-environment
+  PGHOST: postgres
+  PGPORT: "5432"
+  PGDATABASE: ${DATABASE_NAME:-nba_stats}
+  PGUSER: ${DATABASE_USER:-nba_admin}
+  PGPASSWORD: ${DATABASE_PASS:?Copy .env.example to .env and set DATABASE_PASS}
+  PGSSLMODE: ${DATABASE_SSLMODE:-disable}
+
+services:
+  postgres:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:-nba_stats}
+      POSTGRES_USER: ${DATABASE_USER:-nba_admin}
+      POSTGRES_PASSWORD: ${DATABASE_PASS:?Copy .env.example to .env and set DATABASE_PASS}
+    ports:
+      - "127.0.0.1:${DATABASE_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - type: bind
+        source: ../database.sql
+        target: /docker-entrypoint-initdb.d/10-database.sql
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  python:
+    profiles: [tools]
+    build:
+      context: .
+      dockerfile: python.Dockerfile
+    working_dir: /workspace
+    environment:
+      <<: *pg-environment
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - type: bind
+        source: ..
+        target: /workspace
+        read_only: true
+        bind:
+          create_host_path: false
+    command: ["python", "--version"]
+
+  dbt:
+    profiles: [tools]
+    build:
+      context: .
+      dockerfile: dbt.Dockerfile
+    environment:
+      <<: *pg-environment
+      DBT_SCHEMA: ${DBT_SCHEMA:-build_dev}
+      DBT_THREADS: ${DBT_THREADS:-2}
+      DBT_PROFILES_DIR: /opt/dbt
+      DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["--version"]
+
+  go:
+    profiles: [tools]
+    image: golang:1.27.2-bookworm
+    working_dir: /workspace
+    environment:
+      <<: *pg-environment
+    volumes:
+      - type: bind
+        source: ..
+        target: /workspace
+        read_only: true
+        bind:
+          create_host_path: false
+    command: ["go", "version"]
+
+volumes:
+  postgres_data:

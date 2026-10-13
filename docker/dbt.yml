@@ -1,0 +1,13 @@
+# Dependency/connection diagnostic project. It defines no transformations.
+name: nba_dependency_check
+version: "0.1.0"
+config-version: 2
+profile: nba_stats
+model-paths: []
+seed-paths: []
+snapshot-paths: []
+test-paths: []
+macro-paths: []
+target-path: /tmp/dbt-target
+log-path: /tmp/dbt-logs
+packages-install-path: /tmp/dbt-packages
