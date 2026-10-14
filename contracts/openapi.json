@@ -1,0 +1,1306 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "NBA Stats \u2014 First Implemented API",
+    "version": "0.1.0",
+    "description": "Anonymous local-development API. Statistics use one pinned published release per request. Nullable metrics stay null; percentages are fractions. All responses use Cache-Control: no-store. Game logs, cursors and authentication are later extensions."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080"
+    }
+  ],
+  "paths": {
+    "/health/live": {
+      "get": {
+        "operationId": "getLive",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "const": "ok"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Only GET is accepted",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "getReady",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "const": "ready"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Only GET is accepted",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database or published statistics not ready",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/api/v1/status": {
+      "get": {
+        "operationId": "getStatus",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Release"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Only GET is accepted",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No published release, or statistics are temporarily unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Statistics"
+        ]
+      }
+    },
+    "/api/v1/seasons": {
+      "get": {
+        "operationId": "getSeasons",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonList"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Only GET is accepted",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No published release, or statistics are temporarily unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Statistics"
+        ]
+      }
+    },
+    "/api/v1/players": {
+      "get": {
+        "operationId": "listPlayers",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerList"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Only GET is accepted",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No published release, or statistics are temporarily unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Statistics"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "season",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1947,
+              "maximum": 2200
+            },
+            "description": "Season ending year: 2024 means 2023\u201324."
+          },
+          {
+            "in": "query",
+            "name": "phase",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "regular",
+                "playoffs"
+              ],
+              "default": "regular"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "default": ""
+            },
+            "description": "Literal case-insensitive name search; teams also search abbreviations."
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pts_per_game",
+                "pts",
+                "reb_per_game",
+                "ast_per_game",
+                "ts_pct",
+                "games_played",
+                "name"
+              ],
+              "default": "pts_per_game"
+            },
+            "description": "Metrics descending, NULL last; name ascending; ID breaks ties."
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 100
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/comparisons/players": {
+      "get": {
+        "operationId": "comparePlayers",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerList"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Only GET is accepted",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No published release, or statistics are temporarily unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "At least one requested entity has no statistics in the season/phase",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Statistics"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "season",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1947,
+              "maximum": 2200
+            },
+            "description": "Season ending year: 2024 means 2023\u201324."
+          },
+          {
+            "in": "query",
+            "name": "phase",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "regular",
+                "playoffs"
+              ],
+              "default": "regular"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ids",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 504
+            },
+            "description": "2\u20135 unique comma-separated entity IDs. Response rows preserve this order. Spaces are rejected."
+          }
+        ]
+      }
+    },
+    "/api/v1/teams": {
+      "get": {
+        "operationId": "listTeams",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamList"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Only GET is accepted",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No published release, or statistics are temporarily unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Statistics"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "season",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1947,
+              "maximum": 2200
+            },
+            "description": "Season ending year: 2024 means 2023\u201324."
+          },
+          {
+            "in": "query",
+            "name": "phase",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "regular",
+                "playoffs"
+              ],
+              "default": "regular"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "default": ""
+            },
+            "description": "Literal case-insensitive name search; teams also search abbreviations."
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pts_per_game",
+                "pts",
+                "reb_per_game",
+                "ast_per_game",
+                "ts_pct",
+                "games_played",
+                "name",
+                "wins",
+                "win_pct"
+              ],
+              "default": "pts_per_game"
+            },
+            "description": "Metrics descending, NULL last; name ascending; ID breaks ties."
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 100
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/comparisons/teams": {
+      "get": {
+        "operationId": "compareTeams",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamList"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Only GET is accepted",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No published release, or statistics are temporarily unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "At least one requested entity has no statistics in the season/phase",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Statistics"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "season",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1947,
+              "maximum": 2200
+            },
+            "description": "Season ending year: 2024 means 2023\u201324."
+          },
+          {
+            "in": "query",
+            "name": "phase",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "regular",
+                "playoffs"
+              ],
+              "default": "regular"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ids",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 504
+            },
+            "description": "2\u20135 unique comma-separated entity IDs. Response rows preserve this order. Spaces are rejected."
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Player": {
+        "type": "object",
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "season_end_year": {
+            "type": "integer",
+            "minimum": 1947,
+            "maximum": 2200
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "regular",
+              "playoffs"
+            ]
+          },
+          "games_played": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "metrics_basis": {
+            "type": "string",
+            "enum": [
+              "game_totals",
+              "source_totals"
+            ]
+          },
+          "minutes_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "fg": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "fga": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "fg3": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "fg3a": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "ft": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "fta": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "orb": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "drb": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "reb": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "ast": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "stl": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "blk": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "tov": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "pf": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "pts": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "pts_per_game": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "reb_per_game": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "ast_per_game": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "fg_pct": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "fg3_pct": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "ft_pct": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "efg_pct": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "ts_pct": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "player_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "games_started": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "source_scope": {
+            "type": "string",
+            "enum": [
+              "completed_games",
+              "source_all_teams",
+              "source_single_team",
+              "summed_source_stints"
+            ]
+          }
+        },
+        "required": [
+          "display_name",
+          "season_end_year",
+          "phase",
+          "games_played",
+          "metrics_basis",
+          "minutes_seconds",
+          "fg",
+          "fga",
+          "fg3",
+          "fg3a",
+          "ft",
+          "fta",
+          "orb",
+          "drb",
+          "reb",
+          "ast",
+          "stl",
+          "blk",
+          "tov",
+          "pf",
+          "pts",
+          "pts_per_game",
+          "reb_per_game",
+          "ast_per_game",
+          "fg_pct",
+          "fg3_pct",
+          "ft_pct",
+          "efg_pct",
+          "ts_pct",
+          "player_id",
+          "games_started",
+          "source_scope"
+        ],
+        "additionalProperties": false
+      },
+      "Team": {
+        "type": "object",
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "season_end_year": {
+            "type": "integer",
+            "minimum": 1947,
+            "maximum": 2200
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "regular",
+              "playoffs"
+            ]
+          },
+          "games_played": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "metrics_basis": {
+            "type": "string",
+            "enum": [
+              "game_totals",
+              "source_totals"
+            ]
+          },
+          "minutes_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "fg": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "fga": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "fg3": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "fg3a": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "ft": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "fta": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "orb": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "drb": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "reb": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "ast": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "stl": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "blk": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "tov": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "pf": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "pts": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "pts_per_game": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "reb_per_game": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "ast_per_game": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "fg_pct": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "fg3_pct": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "ft_pct": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "efg_pct": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "ts_pct": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "team_season_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "abbreviation": {
+            "type": "string"
+          },
+          "wins": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "losses": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "opponent_pts": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "win_pct": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "points_against_per_game": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "point_differential_per_game": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "display_name",
+          "season_end_year",
+          "phase",
+          "games_played",
+          "metrics_basis",
+          "minutes_seconds",
+          "fg",
+          "fga",
+          "fg3",
+          "fg3a",
+          "ft",
+          "fta",
+          "orb",
+          "drb",
+          "reb",
+          "ast",
+          "stl",
+          "blk",
+          "tov",
+          "pf",
+          "pts",
+          "pts_per_game",
+          "reb_per_game",
+          "ast_per_game",
+          "fg_pct",
+          "fg3_pct",
+          "ft_pct",
+          "efg_pct",
+          "ts_pct",
+          "team_season_id",
+          "abbreviation",
+          "wins",
+          "losses",
+          "opponent_pts",
+          "win_pct",
+          "points_against_per_game",
+          "point_differential_per_game"
+        ],
+        "additionalProperties": false
+      },
+      "Season": {
+        "type": "object",
+        "properties": {
+          "season_end_year": {
+            "type": "integer",
+            "minimum": 1947,
+            "maximum": 2200
+          },
+          "season_label": {
+            "type": "string"
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "regular",
+              "playoffs"
+            ]
+          }
+        },
+        "required": [
+          "season_end_year",
+          "season_label",
+          "phase"
+        ],
+        "additionalProperties": false
+      },
+      "Release": {
+        "type": "object",
+        "properties": {
+          "release_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source_name": {
+            "type": "string"
+          },
+          "sample_data": {
+            "type": "boolean"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "source_observed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "release_id",
+          "source_name",
+          "sample_data",
+          "published_at",
+          "source_observed_at"
+        ],
+        "additionalProperties": false
+      },
+      "Problem": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "instance": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail",
+          "instance"
+        ],
+        "additionalProperties": false
+      },
+      "PlayerList": {
+        "type": "object",
+        "properties": {
+          "release_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Player"
+            }
+          }
+        },
+        "required": [
+          "release_id",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "TeamList": {
+        "type": "object",
+        "properties": {
+          "release_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Team"
+            }
+          }
+        },
+        "required": [
+          "release_id",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "SeasonList": {
+        "type": "object",
+        "properties": {
+          "release_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Season"
+            }
+          }
+        },
+        "required": [
+          "release_id",
+          "data"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

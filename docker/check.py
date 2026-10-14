@@ -85,7 +85,7 @@ def check_artifacts(root: Path) -> None:
             raise ValueError(f"Expected a YAML mapping in {path}")
         print(f"YAML syntax: {path.name}")
 
-    with (root / "openapi.yaml").open(encoding="utf-8") as file:
+    with (root / "contracts" / "openapi.yaml").open(encoding="utf-8") as file:
         spec = yaml.safe_load(file)
     validate(spec)
     print("OpenAPI schema: valid")

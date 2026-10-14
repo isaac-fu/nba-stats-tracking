@@ -1,105 +1,85 @@
 # NBA Stats Tracking
 
-A portfolio project for comparing NBA players and teams using historical seasons and daily updates for completed games.
-
-The planned data flow is:
+A portfolio app for comparing NBA players and teams across seasons. The first working pipeline imports season totals, keeps raw revisions, builds and tests analytics with dbt, publishes a release, and serves it through a Go API and React interface.
 
 ```text
-Python ingestion -> PostgreSQL raw data -> dbt transformations and tests
-                 -> PostgreSQL analytics -> Go REST API -> React
-                                                     -> optional Tableau
+HTML -> Python -> PostgreSQL raw -> dbt build/tests -> PostgreSQL analytics
+                                                   -> Go REST API -> React
+                                                                  -> optional Tableau
 ```
 
-Basketball Reference is the planned source. The next data milestone is parsing a small local sample and loading it into PostgreSQL before adding source fetching.
+## Implemented checkpoints
 
-## Progress so far
-
-| Component | Current status |
+| Checkpoint | What is available |
 | --- | --- |
-| Docker | PostgreSQL and development tools for Python, dbt, and Go are configured. Python and dbt images have been built. |
-| PostgreSQL | The database schema has been initialized from [database.sql](database.sql). The container passed its health check, and the Python database check found the expected relations. |
-| dbt | `dbt debug` passed: configuration, Git, and PostgreSQL connectivity work. The current dbt project is for setup checks; transformation models are still to be written. |
-| Go API | [main.go](api/build/server/main.go) serves `GET /health/live`. A request in Postman returned `200 OK`. This endpoint does not query the database. |
-| React | A React/Vite starter exists in [web/build/client](web/build/client). It still contains the default starter interface and has not been connected to the API. |
+| Python ingestion | Local HTML previews, synthetic fixtures, saved-page imports with source identity checks, immutable observations, complete parse batches, and a fetching client. |
+| dbt analytics | Typed staging, player/team season marts, reviewed team identities, nullable metrics, and 53 data tests. |
+| Publication | Frozen inputs, separate build schemas, artifact and table checks, and an atomic published-release switch. |
+| Go API | Health/status/seasons, player/team statistics, and comparisons of 2–5 entities. |
+| React | Season and phase filters, search, player/team leaderboards, comparison tables, and source labels. |
+| Updates | Repeatable historical and daily season-total refresh commands. Live fetching requires approved access. |
 
-Python ingestion, dbt transformations, analytics publication, NBA statistics endpoints, and the NBA frontend remain to be implemented. Existing database tables do not mean NBA data has been loaded.
+The included sample contains **invented players and totals**, not real NBA results. It has two players and two teams for season-ending 2024. The first slice supports season aggregates; game logs and full-season completeness are not implemented. Team identity seeds currently cover supported NBA codes from season-ending 2005 onward.
+
+## Run all sample checkpoints
+
+Keep Docker Desktop running with Linux containers enabled. Use your existing root `.env`; a fresh checkout can use `.env.example` with its password placeholder replaced. Do not overwrite a working `.env`.
+
+From the repository root, run in either Command Prompt or PowerShell:
+
+```text
+scripts\checkpoints.cmd
+```
+
+An equivalent PowerShell script is also available:
+
+```powershell
+.\scripts\checkpoints.ps1
+```
+
+The script prepares dependencies, starts PostgreSQL, imports the sample, builds/tests/publishes it, and starts the API and React. If an earlier Go health-check container is still running on port 8080, stop its run terminal with Ctrl+C first.
+
+Default application URLs:
+
+- [React app](http://localhost:5173)
+- [API status](http://localhost:8080/api/v1/status)
+- [Player statistics](http://localhost:8080/api/v1/players?season=2024)
+
+Optional `API_PORT` and `WEB_PORT` values in `.env` change the host ports. PostgreSQL still uses port 5432 inside Docker. The database volume and your existing initialization are preserved.
+
+To learn what each command does and run checkpoints individually, follow [the checkpoint guide](docs/CHECKPOINTS.md). Trace one statistic from HTML to React in [the sample walkthrough](docs/SAMPLE_WALKTHROUGH.md). Container details are in [the Docker README](docker/README.md).
 
 ## Repository layout
 
-```text
-nba-stats-tracking/
-├── api/build/server/       Go module and initial HTTP server
-├── contracts/             Reserved for API and metric specifications
-├── database/              Reserved for database migrations and related files
-├── dbt/                   Reserved for transformation models and tests
-├── docker/                Compose, Dockerfiles, dependency lists, setup checks
-├── docs/                  Reserved for detailed project documentation
-├── ingestion/             Reserved for Python data ingestion
-├── orchestration/         Reserved for pipeline scheduling
-├── web/build/client/      React/Vite starter
-├── .env.example           Example development settings
-├── .env                   Your local settings and password
-├── database.sql           Database schema used during initial setup
-└── README.md              Project overview and quick start
-```
+| Folder/file | Purpose |
+| --- | --- |
+| `ingestion/` | Parsing, source fetching, raw loading, fixtures, and ingestion tests. |
+| `dbt/` | The actual transformation project, models, identity seed, macros, and data tests. |
+| `orchestration/` | Candidate preparation, dbt execution, and guarded publication. |
+| `api/build/server/` | Go server and its tests/module files. |
+| `web/build/client/` | React/Vite app. |
+| `contracts/` | OpenAPI contract for the eight implemented routes. |
+| `database/migrations/` | Additive migrations for the existing database. |
+| `database.sql` | Original first-initialization schema; do not rerun it on an initialized database. |
+| `docker/` | Compose, image recipes, dependency lists, and connection checks. |
+| `scripts/` | Sample startup and approved-source refresh helpers. |
+| `docs/` | Checkpoint explanations, data contract, verification notes, and optional Tableau queries. |
 
-The current dbt setup files are in `docker/`. The `dbt/` folder is where the actual models and tests will be added.
+## Data rules
 
-## Quick start
+- Preserve source strings and every accepted observation in raw storage.
+- Prefer a player's all-team row over their team stints; never add both together.
+- Keep unavailable statistics NULL and show them as a dash in the interface.
+- Compute shooting percentages from total makes and attempts.
+- Keep synthetic and real sources in separate releases.
+- Publish only a complete tested build; failures leave the last good release available.
 
-Install and start Docker Desktop with Linux containers enabled. Run the following commands from the repository root, which is currently:
+For authorized saved HTML or live imports, see [ingestion instructions](ingestion/README.md). The live client honors access checks, pacing, conditional responses, and blocks. Automated requests to Basketball Reference returned 403 during this implementation, so live-page compatibility has not been established. Sports Reference describes permission requirements for apps based on scraped data in its [data-use policy](https://www.sports-reference.com/data_use.html).
 
-```text
-C:\Users\user\Documents\nba-stats-tracking
-```
+Historical and daily refreshes are manual commands at this stage; a running daily scheduler is a later addition. Dagster packages are installed in the Python/pipeline environment, but no Dagster service or schedule is configured yet.
 
-For a fresh setup, copy `.env.example` to `.env` and replace `DATABASE_PASS=change-me` with your own local password. If you already have `.env`, keep it. The example uses database `nba_stats`, user `nba_admin`, and host port `5433`.
+## Verification and next work
 
-### Prepare the Docker images
+See [verification notes](docs/VERIFICATION.md) for checks completed and environment limits. Initial pipeline integration used an isolated PostgreSQL-compatible test runtime. The running Docker application was subsequently checked on the target machine: all eight API routes, invalid requests, and React player/team comparisons passed.
 
-```text
-docker compose --env-file .env -f docker/compose.yaml --profile tools pull --ignore-buildable
-docker compose --env-file .env -f docker/compose.yaml --profile tools build
-```
-
-Docker downloads the PostgreSQL and Go images and installs the Python and dbt dependencies while building their images. You do not need to rebuild everything every time you open the project.
-
-### Start PostgreSQL
-
-```text
-docker compose --env-file .env -f docker/compose.yaml up -d --wait postgres
-```
-
-See the [Docker guide](docker/README.md) for the database check, `dbt debug`, environment settings, and troubleshooting.
-
-### Run the Go health endpoint
-
-```text
-docker compose --env-file .env -f docker/compose.yaml --profile tools run --rm -p 127.0.0.1:8080:8080 -w /workspace/api/build/server go go run .
-```
-
-Leave this terminal running. In a second terminal, send a request:
-
-```text
-curl.exe -i http://127.0.0.1:8080/health/live
-```
-
-The expected result is HTTP `200 OK` with `Content-Type: application/json` and this body:
-
-```json
-{"status":"ok"}
-```
-
-You can also send a `GET` request to the same URL in Postman. Its response status, headers, and body appear in separate sections. The Go terminal currently prints the startup message; request logging has not been added.
-
-Press `Ctrl+C` in the server terminal to stop the API. PostgreSQL continues running in the background.
-
-## Next checkpoints
-
-1. Parse a small local sample with Python and load it into raw tables.
-2. Add dbt models and data tests to produce analytics tables.
-3. Add a Go endpoint that reads real statistics from PostgreSQL.
-4. Add source fetching and repeatable historical/daily updates.
-5. Connect the React interface to the API; add Tableau comparisons if useful.
-
-Update these instructions as each checkpoint becomes available. For container commands and configuration details, use [docker/README.md](docker/README.md).
+Next work: validate an approved real source export, expand identity coverage if needed, add game-level ingestion/models, configure scheduling, and prepare a production deployment. [Tableau setup](docs/TABLEAU.md) is optional.

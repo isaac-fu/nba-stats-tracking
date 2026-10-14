@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+.git
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+**/target
+**/logs
+**/dist
+**/dbt_packages
+**/*.exe
+**/*.log

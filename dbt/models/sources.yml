@@ -1,0 +1,12 @@
+version: 2
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: source_page
+      - name: player_season_row
+      - name: team_season_totals_row
+  - name: meta
+    schema: meta
+    tables:
+      - name: release_input

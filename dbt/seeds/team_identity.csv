@@ -1,0 +1,37 @@
+source_team_code,franchise_id,franchise_name,first_season,last_season
+ATL,atlanta_hawks,Atlanta Hawks,2005,9999
+BOS,boston_celtics,Boston Celtics,2005,9999
+CHI,chicago_bulls,Chicago Bulls,2005,9999
+CLE,cleveland_cavaliers,Cleveland Cavaliers,2005,9999
+DAL,dallas_mavericks,Dallas Mavericks,2005,9999
+DEN,denver_nuggets,Denver Nuggets,2005,9999
+DET,detroit_pistons,Detroit Pistons,2005,9999
+GSW,golden_state_warriors,Golden State Warriors,2005,9999
+HOU,houston_rockets,Houston Rockets,2005,9999
+IND,indiana_pacers,Indiana Pacers,2005,9999
+LAC,los_angeles_clippers,Los Angeles Clippers,2005,9999
+LAL,los_angeles_lakers,Los Angeles Lakers,2005,9999
+MEM,memphis_grizzlies,Memphis Grizzlies,2005,9999
+MIA,miami_heat,Miami Heat,2005,9999
+MIL,milwaukee_bucks,Milwaukee Bucks,2005,9999
+MIN,minnesota_timberwolves,Minnesota Timberwolves,2005,9999
+NYK,new_york_knicks,New York Knicks,2005,9999
+ORL,orlando_magic,Orlando Magic,2005,9999
+PHI,philadelphia_76ers,Philadelphia 76ers,2005,9999
+PHO,phoenix_suns,Phoenix Suns,2005,9999
+POR,portland_trail_blazers,Portland Trail Blazers,2005,9999
+SAC,sacramento_kings,Sacramento Kings,2005,9999
+SAS,san_antonio_spurs,San Antonio Spurs,2005,9999
+TOR,toronto_raptors,Toronto Raptors,2005,9999
+UTA,utah_jazz,Utah Jazz,2005,9999
+WAS,washington_wizards,Washington Wizards,2005,9999
+NJN,brooklyn_nets,Brooklyn Nets,2005,2012
+BRK,brooklyn_nets,Brooklyn Nets,2013,9999
+SEA,oklahoma_city_thunder,Oklahoma City Thunder,2005,2008
+OKC,oklahoma_city_thunder,Oklahoma City Thunder,2009,9999
+CHA,charlotte_hornets,Charlotte Hornets,2005,2014
+CHO,charlotte_hornets,Charlotte Hornets,2015,9999
+NOH,new_orleans_pelicans,New Orleans Pelicans,2005,2005
+NOK,new_orleans_pelicans,New Orleans Pelicans,2006,2007
+NOH,new_orleans_pelicans,New Orleans Pelicans,2008,2013
+NOP,new_orleans_pelicans,New Orleans Pelicans,2014,9999

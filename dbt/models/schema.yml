@@ -1,0 +1,136 @@
+version: 2
+models:
+  - name: dim_season
+    data_tests:
+      - unique_key:
+          arguments:
+            columns: [release_id, season_end_year]
+    columns:
+      - name: release_id
+        data_tests: [not_null]
+      - name: season_end_year
+        data_tests: [not_null]
+  - name: dim_player
+    data_tests:
+      - unique_key:
+          arguments:
+            columns: [release_id, player_id]
+    columns:
+      - name: release_id
+        data_tests: [not_null]
+      - name: player_id
+        data_tests: [not_null]
+      - name: display_name
+        data_tests: [not_null]
+  - name: dim_franchise
+    data_tests:
+      - unique_key:
+          arguments:
+            columns: [release_id, franchise_id]
+    columns:
+      - name: release_id
+        data_tests: [not_null]
+      - name: franchise_id
+        data_tests: [not_null]
+      - name: display_name
+        data_tests: [not_null]
+  - name: dim_team_season
+    data_tests:
+      - unique_key:
+          arguments:
+            columns: [release_id, team_season_id]
+    columns:
+      - name: release_id
+        data_tests: [not_null]
+      - name: team_season_id
+        data_tests: [not_null]
+      - name: display_name
+        data_tests: [not_null]
+      - name: franchise_id
+        data_tests: [not_null]
+      - name: season_end_year
+        data_tests: [not_null]
+  - name: mart_player_season
+    data_tests:
+      - unique_key:
+          arguments:
+            columns: [release_id, season_end_year, phase, player_id]
+    columns:
+      - name: release_id
+        data_tests: [not_null]
+      - name: season_end_year
+        data_tests: [not_null]
+      - name: phase
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['regular', 'playoffs']
+      - name: player_id
+        data_tests: [not_null]
+      - name: games_played
+        data_tests: [not_null]
+      - name: metrics_basis
+        data_tests: [not_null]
+  - name: mart_player_team_season
+    data_tests:
+      - unique_key:
+          arguments:
+            columns: [release_id, season_end_year, phase, player_id, team_season_id]
+    columns:
+      - name: release_id
+        data_tests: [not_null]
+      - name: season_end_year
+        data_tests: [not_null]
+      - name: phase
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['regular', 'playoffs']
+      - name: player_id
+        data_tests: [not_null]
+      - name: team_season_id
+        data_tests: [not_null]
+      - name: games_played
+        data_tests: [not_null]
+      - name: metrics_basis
+        data_tests: [not_null]
+  - name: mart_team_season
+    data_tests:
+      - unique_key:
+          arguments:
+            columns: [release_id, season_end_year, phase, team_season_id]
+    columns:
+      - name: release_id
+        data_tests: [not_null]
+      - name: season_end_year
+        data_tests: [not_null]
+      - name: phase
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['regular', 'playoffs']
+      - name: team_season_id
+        data_tests: [not_null]
+      - name: games_played
+        data_tests: [not_null]
+      - name: metrics_basis
+        data_tests: [not_null]
+  - name: release_capability
+    data_tests:
+      - unique_key:
+          arguments:
+            columns: [release_id, season_end_year, phase]
+    columns:
+      - name: release_id
+        data_tests: [not_null]
+      - name: season_end_year
+        data_tests: [not_null]
+      - name: phase
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['regular', 'playoffs']

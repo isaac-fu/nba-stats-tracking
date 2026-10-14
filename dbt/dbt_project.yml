@@ -1,0 +1,21 @@
+name: nba_stats
+version: '1.0.0'
+config-version: 2
+profile: nba_stats
+model-paths: [models]
+seed-paths: [seeds]
+test-paths: [tests]
+macro-paths: [macros]
+clean-targets: [target, dbt_packages]
+models:
+  nba_stats:
+    +materialized: table
+seeds:
+  nba_stats:
+    team_identity:
+      +column_types:
+        source_team_code: text
+        franchise_id: text
+        franchise_name: text
+        first_season: integer
+        last_season: integer
